@@ -125,13 +125,11 @@ def _resolve_plane(b, n, off, e, mu, world):
     # Positional correction.
     b.x = b.x + n * depth[hit].max() * 0.9
     invm, invI = 1.0 / b.mass, b.inv_I
+    order = hit[np.argsort(-depth[hit])]
     b._last_jn = 0.0
-    # Several corners down at once = one contact patch at their centroid.
-    # Applying them one by one pumps a rocking jitter into resting dice.
-    pts = [P[hit].mean(0)] if len(hit) > 1 else [P[hit[0]]]
     for _ in range(3):
-        for pnt in pts:
-            r = pnt - b.x
+        for i in order:
+            r = P[i] - b.x
             vp = b.v + np.cross(b.w, r)
             vn = vp @ n
             if vn >= 0:
