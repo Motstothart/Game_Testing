@@ -72,6 +72,8 @@ class Body:
     mass: float = 1.0
     inside: np.ndarray = field(default_factory=lambda: np.zeros(4, bool))
     asleep: bool = False
+    touching: bool = False
+    impact: float = 0.0          # largest impulse this frame (for sound / shake)
 
     @property
     def R(self):
@@ -123,10 +125,13 @@ def _resolve_plane(b, n, off, e, mu, world):
     # Positional correction.
     b.x = b.x + n * depth[hit].max() * 0.9
     invm, invI = 1.0 / b.mass, b.inv_I
-    order = hit[np.argsort(-depth[hit])]
+    b._last_jn = 0.0
+    # Several corners down at once = one contact patch at their centroid.
+    # Applying them one by one pumps a rocking jitter into resting dice.
+    pts = [P[hit].mean(0)] if len(hit) > 1 else [P[hit[0]]]
     for _ in range(3):
-        for i in order:
-            r = P[i] - b.x
+        for pnt in pts:
+            r = pnt - b.x
             vp = b.v + np.cross(b.w, r)
             vn = vp @ n
             if vn >= 0:
@@ -144,30 +149,76 @@ def _resolve_plane(b, n, off, e, mu, world):
                 J = J - min(jt, mu * jn) * t
             b.v = b.v + J * invm
             b.w = b.w + invI * np.cross(r, J)
+            b._last_jn = max(b._last_jn, jn)
     return True
 
 
-def _resolve_pair(a, b, e=0.5):
-    """Cheap sphere-proxy collision between two dice."""
-    d = b.x - a.x
+def _vertex_contacts(a, b):
+    """Vertices of a that are inside b: (point, normal out of b, depth)."""
+    P = a.world_verts()
+    Rb = b.R
+    loc = (P - b.x) @ Rb / b.size
+    depth = b.shape.offsets[None, :] - loc @ b.shape.normals.T     # (V,F) >0 inside
+    inside = np.all(depth > 0, axis=1)
+    out = []
+    for i in np.where(inside)[0]:
+        f = int(np.argmin(depth[i]))
+        out.append((P[i], Rb @ b.shape.normals[f], depth[i, f] * b.size))
+    return out
+
+
+def _apply_pair_impulse(a, b, p, n, e, mu):
+    """n points from b toward a."""
+    ra, rb = p - a.x, p - b.x
+    va = a.v + np.cross(a.w, ra)
+    vb = b.v + np.cross(b.w, rb)
+    vrel = va - vb
+    vn = vrel @ n
+    if vn >= 0:
+        return 0.0
+    ia, ib = a.inv_I, b.inv_I
+    k = 1 / a.mass + 1 / b.mass + ia * (np.cross(ra, n) @ np.cross(ra, n)) + ib * (np.cross(rb, n) @ np.cross(rb, n))
+    jn = -(1 + e) * vn / k
+    J = jn * n
+    vt = vrel - vn * n
+    vtl = np.linalg.norm(vt)
+    if vtl > 1e-6:
+        t = vt / vtl
+        kt = 1 / a.mass + 1 / b.mass + ia * (np.cross(ra, t) @ np.cross(ra, t)) + ib * (np.cross(rb, t) @ np.cross(rb, t))
+        J = J - min(vtl / kt, mu * jn) * t
+    a.v = a.v + J / a.mass
+    a.w = a.w + ia * np.cross(ra, J)
+    b.v = b.v - J / b.mass
+    b.w = b.w - ib * np.cross(rb, J)
+    return jn
+
+
+def _resolve_pair(a, b, e=0.45, mu=0.3):
+    """Polyhedral contact: vertices of each die tested against the other's
+    faces, plus a core-sphere guard for edge-on-edge hits."""
+    d = a.x - b.x
     dist = np.linalg.norm(d)
-    rad = (a.radius + b.radius) * 0.82
-    if dist >= rad or dist < 1e-6:
+    if dist >= a.radius + b.radius:
         return
-    n = d / dist
-    pen = rad - dist
-    a.x = a.x - n * pen / 2
-    b.x = b.x + n * pen / 2
-    rv = (b.v - a.v) @ n
-    if rv < 0:
-        j = -(1 + e) * rv / 2
-        a.v = a.v - j * n
-        b.v = b.v + j * n
-        # Trade a little spin so the hit reads.
-        kick = np.cross(n, np.array([0, 0, 1.0])) * j * 0.02
-        a.w = a.w - kick
-        b.w = b.w + kick
-        a.asleep = b.asleep = False
+    contacts = [(p, n, dep) for p, n, dep in _vertex_contacts(a, b)]
+    contacts += [(p, -n, dep) for p, n, dep in _vertex_contacts(b, a)]
+    core = (a.size + b.size) * 0.98
+    if not contacts and dist < core and dist > 1e-6:
+        n = d / dist
+        contacts = [(b.x + n * b.size, n, core - dist)]
+    if not contacts:
+        return
+    a.asleep = b.asleep = False
+    deepest = max(contacts, key=lambda c: c[2])
+    n_push = deepest[1]
+    corr = deepest[2] * 0.5
+    a.x = a.x + n_push * corr
+    b.x = b.x - n_push * corr
+    for _ in range(2):
+        for p, n, _d in contacts:
+            jn = _apply_pair_impulse(a, b, p, n, e, mu)
+            a.impact = max(a.impact, jn)
+            b.impact = max(b.impact, jn)
 
 
 def step(bodies, world):
@@ -196,12 +247,15 @@ def step(bodies, world):
             hit = _resolve_plane(b, n, off, e, world.friction, world)
             if wi < 0 and hit:
                 touching = True
+            if hit:
+                b.impact = max(b.impact, b._last_jn)
         damp_l = world.lin_damp * (3.0 if touching else 0.15)
         damp_a = world.ang_damp * (3.0 if touching else 0.15)
         b.v = b.v * np.exp(-damp_l * world.dt)
         b.w = b.w * np.exp(-damp_a * world.dt)
         if touching:
             b.w[2] *= np.exp(-world.floor_spin_damp * world.dt)
+        b.touching = touching
     for i in range(len(bodies)):
         for j in range(i + 1, len(bodies)):
             _resolve_pair(bodies[i], bodies[j])
