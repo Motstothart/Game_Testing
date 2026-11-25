@@ -1,0 +1,152 @@
+[
+ {
+  "name": "01_drop_in_bone_1",
+  "motion": "drop_in",
+  "results": [
+   1
+  ],
+  "palettes": [
+   "bone"
+  ],
+  "frames": 42,
+  "fps": 24
+ },
+ {
+  "name": "02_drop_in_royal_6",
+  "motion": "drop_in",
+  "results": [
+   6
+  ],
+  "palettes": [
+   "royal"
+  ],
+  "frames": 41,
+  "fps": 24
+ },
+ {
+  "name": "03_side_left_onyx_3",
+  "motion": "side_left",
+  "results": [
+   3
+  ],
+  "palettes": [
+   "onyx"
+  ],
+  "frames": 32,
+  "fps": 24
+ },
+ {
+  "name": "04_side_right_gold_5",
+  "motion": "side_right",
+  "results": [
+   5
+  ],
+  "palettes": [
+   "gold"
+  ],
+  "frames": 25,
+  "fps": 24
+ },
+ {
+  "name": "05_bank_shot_royal_4",
+  "motion": "bank_shot",
+  "results": [
+   4
+  ],
+  "palettes": [
+   "royal"
+  ],
+  "frames": 26,
+  "fps": 24
+ },
+ {
+  "name": "06_high_toss_jade_2",
+  "motion": "high_toss",
+  "results": [
+   2
+  ],
+  "palettes": [
+   "jade"
+  ],
+  "frames": 41,
+  "fps": 24
+ },
+ {
+  "name": "07_slam_ivory_red_6",
+  "motion": "slam",
+  "results": [
+   6
+  ],
+  "palettes": [
+   "ivory_red"
+  ],
+  "frames": 42,
+  "fps": 24
+ },
+ {
+  "name": "08_skid_bone_1",
+  "motion": "skid",
+  "results": [
+   1
+  ],
+  "palettes": [
+   "bone"
+  ],
+  "frames": 29,
+  "fps": 24
+ },
+ {
+  "name": "09_spinner_amethyst_5",
+  "motion": "spinner",
+  "results": [
+   5
+  ],
+  "palettes": [
+   "amethyst"
+  ],
+  "frames": 32,
+  "fps": 24
+ },
+ {
+  "name": "10_pair_bone_royal",
+  "motion": "pair",
+  "results": [
+   3,
+   4
+  ],
+  "palettes": [
+   "bone",
+   "royal"
+  ],
+  "frames": 44,
+  "fps": 24
+ },
+ {
+  "name": "11_scatter_triple_six",
+  "motion": "scatter3",
+  "results": [
+   6,
+   6,
+   6
+  ],
+  "palettes": [
+   "gold",
+   "onyx",
+   "jade"
+  ],
+  "frames": 34,
+  "fps": 24
+ },
+ {
+  "name": "12_drop_in_frost_2",
+  "motion": "drop_in",
+  "results": [
+   2
+  ],
+  "palettes": [
+   "frost"
+  ],
+  "frames": 37,
+  "fps": 24
+ }
+]
